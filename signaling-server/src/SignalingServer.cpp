@@ -129,7 +129,6 @@ void SignalingServer::handleRegister(const QJsonArray& sessionList, const QJsonO
 
         for (const QJsonValue& val : sessionList) {
             QString targetId = val.toString();
-            // 跳过自己 (虽然 sessionList 通常不包含自己，但防御性编程)
             if (targetId == srcId) continue;
 
             jsonNotify["to"] = targetId;
@@ -204,7 +203,6 @@ void SignalingServer::handleAnswer(const QJsonArray& sessionList, const QJsonObj
     qDebug() << "Forwarded ANSWER from" << srcId << "to" << targetId;
 }
 
-// 处理 ICE Candidate 转发
 void SignalingServer::handleIce(const QJsonArray& sessionList, const QJsonObject& jsonObj, 
     const QString& srcId, Worker* worker)
 {
