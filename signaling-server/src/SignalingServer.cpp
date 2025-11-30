@@ -83,7 +83,7 @@ void SignalingServer::dispatchMessage(const SignalingTask& task, Worker* worker)
 
     QJsonObject rootJson = doc.object();
     
-    // B. »ñÈ¡ÏûÏ¢ÀàĞÍ
+    // B. Get message type
     if (!rootJson.contains("type") || !rootJson["type"].isString()) {
         handleError("Invalid type", task._clientId, worker);
         return;
@@ -129,7 +129,7 @@ void SignalingServer::handleRegister(const QJsonArray& sessionList, const QJsonO
 
         for (const QJsonValue& val : sessionList) {
             QString targetId = val.toString();
-            // Ìø¹ı×Ô¼º (ËäÈ» sessionList Í¨³£²»°üº¬×Ô¼º£¬µ«·ÀÓùĞÔ±à³Ì)
+            // è·³è¿‡è‡ªå·± (è™½ç„¶ sessionList é€šå¸¸ä¸åŒ…å«è‡ªå·±ï¼Œä½†é˜²å¾¡æ€§ç¼–ç¨‹)
             if (targetId == srcId) continue;
 
             jsonNotify["to"] = targetId;
@@ -207,7 +207,7 @@ void SignalingServer::handleAnswer(const QJsonArray& sessionList, const QJsonObj
     qDebug() << "Forwarded ANSWER from" << srcId << "to" << targetId;
 }
 
-// ´¦Àí ICE Candidate ×ª·¢
+// å¤„ç† ICE Candidate è½¬å‘
 void SignalingServer::handleIce(const QJsonArray& sessionList, const QJsonObject& jsonObj, 
     const QString& srcId, Worker* worker)
 {
