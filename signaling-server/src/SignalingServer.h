@@ -133,7 +133,7 @@ private:
     * @brief Retrieves the list of peers.  
     * @return A JSON array containing the list of peers.  
     */  
-   QJsonArray getPeertList();  
+   QJsonArray getPeerList();  
 
    /**  
     * @brief Checks if a client is online.  
