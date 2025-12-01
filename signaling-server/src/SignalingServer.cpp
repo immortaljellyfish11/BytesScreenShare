@@ -27,14 +27,14 @@ SignalingServer::~SignalingServer()
 bool SignalingServer::start(const QHostAddress& address, quint16 port)
 {
     if (_isRunning == false) {
-        qInfo() << "Signaling Server is running! Listen on: " << address.toString() << ":" << port;
+        INFO() << "Signaling Server is running! Listen on: " << address.toString() << ":" << port;
         _hostAddress = address;
         _port = port;
         _server->listen(_hostAddress, port);
         _isRunning = true;
         return true;
     }
-    qWarning() << "The server has already started!";
+    WARNING() << "The server has already started!";
     return false;
 }
 
@@ -42,11 +42,11 @@ bool SignalingServer::stop()
 {
     if (_isRunning == true) {
         _server->close();
-        qInfo() << "Signaling Server is closed!";
+        INFO() << "Signaling Server is closed!";
         _isRunning = false;
         return true;
     }
-    qWarning() << "The server has already shut down!";
+    WARNING() << "The server has already shut down!";
     return false;
 }
 
@@ -166,8 +166,6 @@ void SignalingServer::handleOffer(const QJsonArray& sessionList, const QJsonObje
 
     QString payload = QJsonDocument(forwardJson).toJson(QJsonDocument::Compact);
     emit worker->sigSendResponse(targetId, payload);
-
-    qDebug() << "Forwarded OFFER from" << srcId << "to" << targetId;
 }
 
 void SignalingServer::handleAnswer(const QJsonArray& sessionList, const QJsonObject& jsonObj, 
@@ -199,8 +197,6 @@ void SignalingServer::handleAnswer(const QJsonArray& sessionList, const QJsonObj
 
     QString payload = QJsonDocument(forwardJson).toJson(QJsonDocument::Compact);
     emit worker->sigSendResponse(targetId, payload);
-
-    qDebug() << "Forwarded ANSWER from" << srcId << "to" << targetId;
 }
 
 void SignalingServer::handleIce(const QJsonArray& sessionList, const QJsonObject& jsonObj, 
@@ -245,9 +241,9 @@ void SignalingServer::handleError(const QString& message, const QString& clientI
     errorJson.insert("from", "Server");
     errorJson.insert("to", clientId);
     errorJson.insert("data", data);
-    auto payload = QJsonDocument(errorJson).toJson(QJsonDocument::Compact);
-    qInfo() << "[" << stype_to_string(SignalingType::ERROR_MESSAGE) << "] " <<
-    "Client: " << clientId << " << " << message;
+    auto payload = QJsonDocument(errorJson).toJson(QJsonDocument::Compact); 
+    INFO() << "[" << stype_to_string(SignalingType::ERROR_MESSAGE) << "] " <<
+        "Client: " << clientId << " : " << message;
     emit worker->sigSendResponse(clientId, QString(payload));
 }
 
@@ -297,7 +293,7 @@ void SignalingServer::onClientDataReady(const QString& srcId, const QString& dat
 void SignalingServer::onWorkerResult(const QString& targetClient, const QString& message)
 {
     if (!_sessions.contains(targetClient) || _sessions[targetClient] == nullptr) {
-        qWarning() << targetClient << " has already offlined";
+        WARNING() << targetClient << " has already offlined";
         return;
     }
     auto session = _sessions[targetClient];
@@ -326,9 +322,9 @@ ClientSession::ClientSession(QWebSocket* sock, QObject* parent) :
 	_socket->setParent(this);
 
 	_id = QUuid::createUuid().toString(QUuid::Id128);
-	qDebug() << "ClientSession created. ID:" << _id << "Description: " <<
-		"listen on port " << _socket->localPort() << 
-        "; Peer address and port " << _socket->peerAddress() << ":" << _socket->peerPort();
+    DEBUG() << "ClientSession created. ID:" << _id << "Description: " <<
+        "listen on port " << _socket->localPort() <<
+        "; Peer address and port " << _socket->peerAddress() << ":" << _socket->peerPort(); 
 
 	connect(_socket, &QWebSocket::textMessageReceived, this, &ClientSession::onTextMessageReceived);
 	connect(_socket, &QWebSocket::disconnected, this, &ClientSession::onDisconnected);
@@ -344,26 +340,26 @@ QString ClientSession::id() const
 void ClientSession::sendData(const QString& data)
 {
     if (_socket == nullptr) {
-        qWarning() << "ClientSession::sendData called with null socket. ID:" << _id;
+        CRITICAL() << "ClientSession::sendData called with null socket. ID:" << _id;
         return;
     }
 
     if (_socket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "ClientSession::sendData failed. Socket not connected. ID:" << _id;
+        WARNING() << "ClientSession::sendData failed. Socket not connected. ID:" << _id;
         return;
     }
 
-    qDebug() << data;
+    INFO() << "Send: " << data << " to " << id();
     qint64 bytesSent = _socket->sendTextMessage(data);
     if (bytesSent == -1) {
-        qWarning() << "ClientSession::sendData failed to send message. ID:" << _id
+        WARNING() << "ClientSession::sendData failed to send message. ID:" << _id
             << "Error:" << _socket->errorString();
         if (_socket->error() != QAbstractSocket::SocketTimeoutError) {
             _socket->close();
         }
     }
     else if (bytesSent != data.toUtf8().size()) {
-        qDebug() << "ClientSession::sendData partial send. ID:" << _id
+        WARNING() << "ClientSession::sendData partial send. ID:" << _id
             << "Sent:" << bytesSent << "Expected:" << data.size();
     }
 }

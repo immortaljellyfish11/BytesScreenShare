@@ -17,7 +17,7 @@ void Worker::stop()
 
 void Worker::startLoop()
 {
-    qDebug() << "Worker" << _workerId << "start";
+    INFO() << "Worker" << _workerId << "start";
     _isRunning.testAndSetRelaxed(false, true);
     while (true) {
         SignalingTask task;
@@ -35,7 +35,7 @@ void Worker::startLoop()
             }
         }
     }
-    qDebug() << "Worker" << _workerId << "exit";
+    INFO() << "Worker" << _workerId << "exit";
     emit finished();
 }
 
@@ -63,12 +63,12 @@ WorkerPool::~WorkerPool()
 bool WorkerPool::start(size_t threadCount, Worker::SignalingProcessor processor)
 {
     if (!_isRunning.testAndSetRelaxed(false, true)) {
-        qWarning() << "WorkerPool: Already running.";
+        WARNING() << "WorkerPool: Already running.";
         return false;
     }
     else if (threadCount == 0) {
-        qWarning() << "Thread count must be greater than 0, you input: " << threadCount;
-        return false;
+        FATAL() << "Thread count must be greater than 0, you input: " << threadCount;
+        assert(threadCount > 0);
     }
 
     for (int i = 0; i < threadCount; ++i) {
@@ -86,8 +86,7 @@ bool WorkerPool::start(size_t threadCount, Worker::SignalingProcessor processor)
         _workers.append(worker);
         thread->start();
     }
-    qDebug() << "WorkerPool started with" << threadCount << "threads.";
-    
+    INFO() << "WorkerPool started with" << threadCount << "threads.";
     return true;
 }
 
@@ -109,7 +108,7 @@ void WorkerPool::stop()
             thread->wait();
         }
     }
-    qInfo() << "wait successfully!";
+    INFO() << "wait all threads successfully!";
     _threads.clear();
     _workers.clear();
 }
@@ -117,7 +116,7 @@ void WorkerPool::stop()
 bool WorkerPool::submitTask(const SignalingTask& task)
 {
     if (_isRunning.loadRelaxed() == false || _taskQueue == nullptr) {
-        qWarning() << "WorkerPool is not running!";
+        CRITICAL() << "WorkerPool is not running!";
         return false;
     }
     _taskQueue->push(task);
@@ -134,6 +133,6 @@ void WorkerPool::onSendResponse(const QString& targetId, const QString& json)
 void WorkerPool::handleWorkerFinished() {
     QThread* thread = qobject_cast<QThread*>(QObject::sender());
     if (thread) {
-        qDebug() << "Thread finished:" << thread;
+        DEBUG() << "Thread finished:" << thread;
     }
 }
