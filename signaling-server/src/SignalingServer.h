@@ -64,7 +64,7 @@ public:
     * @param port The port to bind the server to.  
     * @return True if the server starts successfully, false otherwise.  
     */  
-   bool start(const QHostAddress& address, quint16 port);  
+   bool start(const QHostAddress& address = QHostAddress::Any, quint16 port = 11290);
 
    /**  
     * @brief Stops the WebSocket server.  
