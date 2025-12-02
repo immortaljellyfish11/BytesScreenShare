@@ -1,7 +1,7 @@
 #include "SignalingServer.h"
 
-SignalingServer::SignalingServer(const QHostAddress& address, quint16 port, int workerNum, QObject* parent)
-: QObject(parent),
+SignalingServer::SignalingServer(const QHostAddress& address, quint16 port, int workerNum)
+: QObject(nullptr),
 _server(new QWebSocketServer(QStringLiteral("Signaling Server"),
     QWebSocketServer::NonSecureMode, this)),
 _workerPool(new WorkerPool(this)),
@@ -21,6 +21,12 @@ _isRunning(false)
     _workerPool->start(workerNum, processor);
 }
 
+SignalingServer* SignalingServer::getInstance(const QHostAddress& address, quint16 port, int workerNum)  
+{  
+   static SignalingServer* instance = new SignalingServer(address, port, workerNum);  
+   return instance;  
+}
+
 SignalingServer::~SignalingServer()
 {}
 
@@ -30,7 +36,7 @@ bool SignalingServer::start(const QHostAddress& address, quint16 port)
         INFO() << "Signaling Server is running! Listen on: " << address.toString() << ":" << port;
         _hostAddress = address;
         _port = port;
-        _server->listen(_hostAddress, port);
+        _server->listen(_hostAddress, _port);
         _isRunning = true;
         return true;
     }

@@ -1,10 +1,6 @@
 #ifndef __WORKER_H__  
 #define __WORKER_H__  
 
-#include <QObject>  
-#include <QAtomicInt>
-#include <QThread>
-#include <memory>
 #include "Common.hpp"  
 #include "BlockingQueue.hpp"  
 
@@ -121,9 +117,10 @@ public:
    bool start(size_t threadCount, Worker::SignalingProcessor processor);  
 
    /**  
-    * @brief Stops all Worker loops and waits for all threads to exit safely.  
+    * @brief Stops all Worker loops and waits for all threads to exit safely.
+    * @return True if the thread pool stops successfully, false otherwise.
     */  
-   void stop();  
+   bool stop();  
 
    /**  
     * @brief Producer interface: Submits a task to the queue.  

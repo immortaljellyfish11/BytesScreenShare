@@ -90,9 +90,9 @@ bool WorkerPool::start(size_t threadCount, Worker::SignalingProcessor processor)
     return true;
 }
 
-void WorkerPool::stop()
+bool WorkerPool::stop()
 {
-    if (!_isRunning.testAndSetOrdered(true, false)) { return; }
+    if (!_isRunning.testAndSetOrdered(true, false)) { return false; }
 
     for (Worker* worker : _workers) {
         worker->stop();
@@ -111,6 +111,7 @@ void WorkerPool::stop()
     INFO() << "wait all threads successfully!";
     _threads.clear();
     _workers.clear();
+    return true;
 }
 
 bool WorkerPool::submitTask(const SignalingTask& task)

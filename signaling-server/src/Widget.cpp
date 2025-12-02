@@ -28,16 +28,12 @@ Widget::Widget(QWidget* parent)
 Widget::~Widget()
 {
     stopServer();
-    if (server) {
-        delete server;
-        server = nullptr;
-    }
 }
 
 void Widget::startServer()
 {
     if (!server) {
-        server = new SignalingServer(QHostAddress::Any, 11290, 2, this);
+        server = SignalingServer::getInstance();
         server->start(QHostAddress::Any, 11290);
     }
     serverRunning = true;
@@ -47,7 +43,6 @@ void Widget::stopServer()
 {
     if (server) {
         server->stop();
-        delete server;
         server = nullptr;
     }
     serverRunning = false;
