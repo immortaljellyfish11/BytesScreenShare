@@ -121,20 +121,21 @@ classDiagram
 ```
 
 ## SignalingServer API
-### `SignalingServer`
+SignalingServer类采用单例模式进行实现，对外只暴露三个接口。分别是**获取实例、启动服务器、关闭服务器**。
+
+### `getInstance`
 函数原型：
 ```C++
-SignalingServer(const QHostAddress& address = QHostAddress::Any, quint16 port = 11290, int workerNum = DEFAULT_WORKER_NUMBER, QObject* parent = nullptr);
+static SignalingServer* getInstance(const QHostAddress& address = QHostAddress::Any, quint16 port = 11290, int workerNum = DEFAULT_WORKER_NUMBER);
 ```
-SignalingServer的构造函数，支持全缺省构造。
+SignalingServer使用单例模式实现，确保全局只存在一个实例，需要通过该接口获得实例。内部依赖C++11标准的静态变量的资源申请机制，是线程安全且懒加载的。
 
 参数：
 - `address`: 传入Qt框架下封装的IP地址，详见 [QHostAddress Class | Qt Network](https://doc.qt.io/qt-6/qhostaddress.html) 。缺省参数`QHostAddress::Any`将会监听 IPv4 和 IPv6 的所有地址。地址可以在调用`start`接口的时候再次指定。
 - `port`：传入一个端口号，指定本地的监听端口。端口可以在调用`start`接口的时候再次指定。
 - `workerNum`：指定信令服务器的业务线程的线程数量，默认数量为**2**。
-- `parent`：用于添加父对象指针到Qt框架下的对象树，以便自动管理申请的资源。如果使用默认参数`nullptr`，则需要手动释放资源。
 
-### ` start`
+### `start`
 函数原型：
 ```C++
 bool start(const QHostAddress& address = QHostAddress::Any, quint16 port = 11290);
