@@ -1,7 +1,7 @@
 #include "SignalingServer.h"
 
-SignalingServer::SignalingServer(const QHostAddress& address, quint16 port, int workerNum, QObject* parent)
-: QObject(parent),
+SignalingServer::SignalingServer(const QHostAddress& address, quint16 port, int workerNum)
+: QObject(nullptr),
 _server(new QWebSocketServer(QStringLiteral("Signaling Server"),
     QWebSocketServer::NonSecureMode, this)),
 _workerPool(new WorkerPool(this)),
@@ -19,6 +19,12 @@ _isRunning(false)
         this->dispatchMessage(task, source);
     };
     _workerPool->start(workerNum, processor);
+}
+
+SignalingServer* SignalingServer::getInstance(const QHostAddress& address, quint16 port, int workerNum)  
+{  
+   static SignalingServer* instance = new SignalingServer(address, port, workerNum);  
+   return instance;  
 }
 
 SignalingServer::~SignalingServer()

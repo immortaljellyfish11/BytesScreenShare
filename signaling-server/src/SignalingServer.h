@@ -27,7 +27,7 @@ public:
     * @param worker Pointer to the Worker instance processing the task.  
     */  
    using handlerFunc = std::function<void(const QJsonObject& json, const QString& clientId, Worker* worker)>;  
-
+private:
    /**  
     * @brief Constructs a SignalingServer instance.  
     * @param address The address to bind the WebSocket server to.  
@@ -35,9 +35,28 @@ public:
     * @param workerNum The number of worker threads to create.  
     * @param parent Pointer to the parent QObject (default is nullptr).  
     */  
-   SignalingServer(const QHostAddress& address = QHostAddress::Any, quint16 port = 11290, int workerNum = DEFAULT_WORKER_NUMBER, QObject* parent = nullptr);  
+   SignalingServer(const QHostAddress& address, quint16 port, int workerNum);
 
-   /**  
+   Q_DISABLE_COPY(SignalingServer)
+
+public:
+
+    /**  
+    * @brief Retrieves the singleton instance of the SignalingServer.  
+    *  
+    * This method ensures that only one instance of the SignalingServer exists  
+    * throughout the application. If the instance does not already exist, it is  
+    * created with the specified address, port, and number of worker threads.  
+    *  
+    * @param address The address to bind the WebSocket server to. Defaults to QHostAddress::Any.  
+    * @param port The port to bind the WebSocket server to. Defaults to 11290.  
+    * @param workerNum The number of worker threads to create. Defaults to DEFAULT_WORKER_NUMBER.  
+    * @return A pointer to the singleton instance of the SignalingServer.  
+    */  
+    static SignalingServer* getInstance(const QHostAddress& address = QHostAddress::Any, quint16 port = 11290, int workerNum = DEFAULT_WORKER_NUMBER);
+   
+    
+    /**  
     * @brief Destructor for the SignalingServer class.  
     */  
    ~SignalingServer();  
