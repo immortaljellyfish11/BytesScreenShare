@@ -20,7 +20,7 @@
 #include <rtc/rtc.hpp>
 
 #include <string>
-#inlcude <memory>
+#include <memory>
 
 using namespace std;
 
