@@ -35,7 +35,7 @@ signals:
     // 告诉外界：捕获状态变了 (可选)
     void captureStateChanged(bool isRunning);
 
-    void videoDataReady(const std::vector<uint8_t>& data);
+    void videoDataReady(const QByteArray& data, uint32_t timestamp);
     void encodedFrameReady(const QByteArray& encodedData, uint32_t timestamp);
 
 private:

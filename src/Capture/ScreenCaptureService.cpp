@@ -49,8 +49,9 @@ void ScreenCaptureService::startCapture()
 {   
     if (!m_encoder) {
         m_encoder = new VideoEncoder(this);
-        // 1080p, 30fps, 4Mbps (提高码率以保证画质)
-        if (m_encoder->init(640, 360, 15, 4000000)) {
+        // 此处设置分辨率（例：1920 * 1080， 30fps， 3Mbps，
+        // 码率需要和分辨率对应才有用）
+        if (m_encoder->init(640, 360, 15, 1000000)) {
             qDebug() << "Video Encoder Initialized!";
         }
         else {

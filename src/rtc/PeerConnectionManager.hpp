@@ -15,7 +15,7 @@ public:
 
     void registerClient();
     void start(const QString& targetId);
-    void sendEncodedVideoFrame(const QByteArray& encodedData);
+    void sendEncodedVideoFrame(const QByteArray& encodedData, uint32_t timestamp);
     QString id() const;
     QString target() const;
 
@@ -39,6 +39,7 @@ public:
     void onSignalingMessage(const QJsonObject& obj);
     void onJoined(const QString& peerId);
     void sendEncodedFrame(const QByteArray& data, uint32_t timestamp);
+    void stop();
 
 private:
     void handleSignalingMessage(const QJsonObject& json);
@@ -47,7 +48,8 @@ private:
     void createPeerConnection();
     void setupDataChannel();
     void bindDataChannel(std::shared_ptr<rtc::DataChannel> dc);
-
+    void sendRtpPacket(const std::vector<uint8_t>& payload, bool marker);
+    
     
     
 private:
@@ -59,4 +61,13 @@ private:
     QString m_myId;
     QString m_targetPeerId;
     bool m_isCaller; 
+    uint16_t sequenceNumber_ = 0;
+    uint32_t ssrc_ = 0;
+    // 【新增】RTP 封包需要的状态变量
+    uint16_t m_sequenceNumber = 0;
+    uint32_t m_ssrc = 323010; // 随便给个 ID
+    uint32_t currentTimestamp_ = 0;
+
+    const size_t MAX_RTP_PAYLOAD_SIZE = 1100; // 留出空间给 IP/UDP/RTP 头，保守设为 1100
+    const int payloadType_ = 96;
 };

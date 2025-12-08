@@ -98,12 +98,12 @@ void PeerConnectionManager::bindDataChannel(std::shared_ptr<rtc::DataChannel> dc
         });
 
     m_videoChannel->onMessage([this](std::variant<rtc::binary, rtc::string> data) {
-        // æ–‡æœ¬æ¶ˆæ¯
+        // ÎÄ±¾ÏûÏ¢
         if (std::holds_alternative<rtc::string>(data)) {
             auto &str = std::get<rtc::string>(data);
             qDebug() << "Callee received text:" << QString::fromStdString(str);
 
-            // æ¯”å¦‚è¿™é‡Œä½ å¯ï¿½? emit ä¿¡å·ï¼Œé€šçŸ¥ UI æ˜¾ç¤ºæ¶ˆæ¯
+            // ±ÈÈçÕâÀïÄã¿É?? emit ĞÅºÅ£¬Í¨Öª UI ÏÔÊ¾ÏûÏ¢
             return;
         }
 
@@ -141,7 +141,7 @@ void PeerConnectionManager::handleSignalingMessage(const QJsonObject& json)
             m_targetPeerId = from;
             m_isCaller = false;
 
-            if (!m_pc) {   // ï¿½? åªåœ¨æ²¡æœ‰ PC æ—¶æ‰åˆ›å»ºä¸€ï¿½?
+            if (!m_pc) {   // ?? Ö»ÔÚÃ»ÓĞ PC Ê±²Å´´½¨Ò»??
                 createPeerConnection();
             }
 
@@ -254,99 +254,306 @@ void PeerConnectionManager::sendtest(){
     }
 }
 
-void PeerConnectionManager::sendEncodedFrame(const QByteArray& data, uint32_t timestamp)
+#include <vector>
+#include <cstring> // for memcpy
+#include <algorithm> // for std::min
+#include <cstddef>   // for std::byte
+
+// ... (Ç°ÃæµÄ´úÂë)
+
+void PeerConnectionManager::sendEncodedFrame(const QByteArray& encodedData, uint32_t timestamp)
 {
-    // ä»…é€šè¿‡æ•°æ®é€šé“å‘é€è§†é¢‘å¸§
+    // 1. Í¨µÀ¼ì²é
     if (m_videoChannel && m_videoChannel->isOpen()) {
-        // è½¬æ¢ï¿½? libdatachannel éœ€è¦çš„ std::byte æ ¼å¼
-        // æ³¨æ„ï¼šDataChannel é»˜è®¤ MTU é™åˆ¶ï¼ˆé€šå¸¸ 64KB - å¤´éƒ¨ï¼‰ï¿½?
-        // å¦‚æœä½ çš„å›¾ç‰‡å¾ˆå¤§ï¼ˆä¾‹ï¿½? 4K æˆªå›¾ï¼‰ï¼Œè¿™é‡Œä¼šå¤±è´¥ï¼Œéœ€è¦åˆ†ç‰‡ï¿½?
-        // ä½†å¯¹ï¿½? 1080p çš„ä¸­ç­‰è´¨ï¿½? JPEG (é€šå¸¸ < 100KB)ï¼Œè¿™å¯èƒ½å‹‰å¼ºèƒ½è¡Œï¼Œå»ºè®®åˆ†ç‰‡ï¿½?
-        // *ç®€å•æ–¹ï¿½?*ï¼šæ§ï¿½? JPEG è´¨é‡ï¼Œç¡®ä¿æ¯å¸§å°ï¿½? 64KBï¿½?
 
-        try {
-            std::vector<std::byte> binData(data.size());
-            std::memcpy(binData.data(), data.constData(), data.size());
+        // 2. ×¼±¸Ô­Ê¼Êı¾İ
+        const uint8_t* nalData = reinterpret_cast<const uint8_t*>(encodedData.constData());
+        size_t totalSize = encodedData.size();
+        if (totalSize == 0) return;
 
-            QByteArray byteArray(reinterpret_cast<const char*>(binData.data()), binData.size());
-            // æ˜¾ç¤ºåå…­è¿›åˆ¶
-            qDebug() << "original binData :" << byteArray.toHex(' ');
+        // H.264 Í·ĞÅÏ¢
+        uint8_t nalHeader = nalData[0];
+        uint8_t nalType = nalHeader & 0x1F;
 
+        // ¡¾¸üĞÂ¡¿------------------------
+        // RTP ÇĞÆ¬Âß¼­
 
+        //  Çé¿ö A: NALUµ¥¸ö°üĞ¡£¬¿ÉÒÔÖ±½Ó´« 
+        if (totalSize <= MAX_RTP_PAYLOAD_SIZE) {
+            // Ö±½Ó·ÖÅä libdatachannel ĞèÒªµÄ std::vector<std::byte>
+            std::vector<std::byte> packet(12 + totalSize);
+
+            // µ«ÊÇ¸³ÖµÒªuint8_t* ĞèÒªÒ»¸öÖ¸ÕëÖ¸ÏòÕâ¶ÎÄÚ´æ
+            uint8_t* header = reinterpret_cast<uint8_t*>(packet.data());
+
+            // RTP Header (12 bytes)
+            header[0] = 0x80;
+            header[1] = 0x80 | (payloadType_ & 0x7F); // Marker = 1
+            header[2] = (m_sequenceNumber >> 8) & 0xFF;
+            header[3] = m_sequenceNumber & 0xFF;
+            m_sequenceNumber++;
+
+            header[4] = (currentTimestamp_ >> 24) & 0xFF;
+            header[5] = (currentTimestamp_ >> 16) & 0xFF;
+            header[6] = (currentTimestamp_ >> 8) & 0xFF;
+            header[7] = currentTimestamp_ & 0xFF;
+            header[8] = (m_ssrc >> 24) & 0xFF;
+            header[9] = (m_ssrc >> 16) & 0xFF;
+            header[10] = (m_ssrc >> 8) & 0xFF;
+            header[11] = m_ssrc & 0xFF;
+
+            // Copy Payload
+            std::memcpy(header + 12, nalData, totalSize);
+
+            // 1. ×ª³É QByteArray (ÎªÁË·½±ã´òÓ¡)
+            QByteArray debugHex(reinterpret_cast<const char*>(packet.data()), packet.size());
+
+            // 2. ´òÓ¡ÈÕÖ¾ (Type, Size, Hex)     
+            qDebug() << "original binData :" << debugHex.toHex(' ');
             qDebug("video data send!");
-            m_videoChannel->send(binData); // æ—¶é—´æˆ³æ²¡æœ‰sendå‡ºå»
+
+            // ¡¾·¢ËÍ¡¿
+            try {
+                m_videoChannel->send(packet);
+            }
+            catch (...) {
+                qDebug() << "Send frame failed. Channel might be busy or closed.";
+            }
+
+            return;
         }
-        catch (...) {
-            qDebug() << "Send frame failed. Channel might be busy or closed.";
+
+        // === Çé¿ö B: NALUÌ«´ó£¬ÇĞÆ¬ (FU-A) ===
+        const uint8_t* payloadData = nalData + 1;
+        size_t payloadSize = totalSize - 1;
+        size_t offset = 0;
+
+        while (offset < payloadSize) {
+            size_t chunkSize = std::min(MAX_RTP_PAYLOAD_SIZE - 2, payloadSize - offset);
+            bool isFirst = (offset == 0);
+            bool isLast = (offset + chunkSize == payloadSize);
+
+            // Ö±½Ó·ÖÅä std::vector<std::byte>
+            std::vector<std::byte> packet(12 + 2 + chunkSize);
+
+            // »ñÈ¡¿ÉĞ´µÄ uint8_t Ö¸Õë
+            uint8_t* header = reinterpret_cast<uint8_t*>(packet.data());
+
+            // RTP Header
+            header[0] = 0x80;
+            // Ö»ÓĞ×îºóÒ»Æ¬ Marker=1£¬ÆäËûÎª0
+            header[1] = (isLast ? 0x80 : 0x00) | (payloadType_ & 0x7F);
+            header[2] = (m_sequenceNumber >> 8) & 0xFF;
+            header[3] = m_sequenceNumber & 0xFF;
+            m_sequenceNumber++;
+            header[4] = (currentTimestamp_ >> 24) & 0xFF;
+            header[5] = (currentTimestamp_ >> 16) & 0xFF;
+            header[6] = (currentTimestamp_ >> 8) & 0xFF;
+            header[7] = currentTimestamp_ & 0xFF;
+
+            header[8] = (m_ssrc >> 24) & 0xFF;
+            header[9] = (m_ssrc >> 16) & 0xFF;
+            header[10] = (m_ssrc >> 8) & 0xFF;
+            header[11] = m_ssrc & 0xFF;
+
+            // FU Indicator 
+            header[12] = (nalHeader & 0xE0) | 28;
+
+            // FU Header
+            header[13] = nalType;
+            if (isFirst) header[13] |= 0x80; // S bit
+            if (isLast)  header[13] |= 0x40; // E bit
+
+            // Copy Payload Chunk
+            std::memcpy(header + 14, payloadData + offset, chunkSize);
+
+            // 1. ×ª³É QByteArray (ÎªÁË·½±ã´òÓ¡)
+            QByteArray debugHex(reinterpret_cast<const char*>(packet.data()), packet.size());
+
+            // 2. ´òÓ¡ÈÕÖ¾ (Type, Size, Hex)     
+            qDebug() << "original binData :" << debugHex.toHex(' ');
+            qDebug("video data send!");
+
+            // ¡¾·¢ËÍ¡¿
+            try {
+                m_videoChannel->send(packet);
+            }
+            catch (...) {
+                qDebug() << "Send frame failed. Channel might be busy or closed.";
+            }
+
+            offset += chunkSize;
         }
     }else {
-        // å¦‚æœ DataChannel è¿˜æ²¡æ‰“å¼€æˆ–å·²å…³é—­ï¼Œåˆ™ä¸¢å¼ƒæ•°æ®
-        qDebug() << "DataChannel not open. Dropping encoded frame.";
+        // Èç¹û DataChannel »¹Ã»´ò¿ª»òÒÑ¹Ø±Õ£¬Ôò¶ªÆúÊı¾İ
+		qDebug() << "DataChannel not open. Dropping encoded frame.";
     }
+        
 }
 
-// void PeerConnectionManager::sendH264(const std::vector<uint8_t>& nalData, uint32_t timestamp)
-// {
+void PeerConnectionManager::stop()
+{
+    // 1. ¹Ø±Õ DataChannel
+    if (m_videoChannel) {
+        // Èç¹û DataChannel ÈÔ´¦ÓÚ´ò¿ª×´Ì¬£¬³¢ÊÔ¹Ø±ÕËü
+        if (m_videoChannel->isOpen()) {
+            try {
+                m_videoChannel->close();
+                qDebug() << "DataChannel closed successfully.";
+            } catch (const std::exception& e) {
+                qWarning() << "Error closing DataChannel:" << e.what();
+            }
+        }
+        // Çå³ı¹²ÏíÖ¸ÕëÒıÓÃ
+        m_videoChannel.reset();
+    }
+    
+    // 2. ¹Ø±Õ PeerConnection
+    if (m_pc) {
+        // ¶Ï¿ªµ×²ãµÄ WebRTC Á¬½Ó¡£
+        // Õâ½«´¥·¢ ICE Á¬½Ó¹Ø±Õ£¬²¢ÔÚÔ¶¶Ë´¥·¢Á¬½Ó×´Ì¬±ä»¯¡£
+        try {
+            m_pc->close(); 
+            qDebug() << "PeerConnection closed successfully.";
+        } catch (const std::exception& e) {
+            qWarning() << "Error closing PeerConnection:" << e.what();
+        }
+        // Çå³ı¹²ÏíÖ¸ÕëÒıÓÃ¡£ÓÉÓÚ m_pc ÊÇ shared_ptr£¬Õâ»á¼õÉÙÒıÓÃ¼ÆÊı¡£
+        // Èç¹ûÃ»ÓĞÆäËûÒıÓÃ£¬¶ÔÏó½«±»Ïú»Ù£¬ÊÍ·ÅËùÓĞ WebRTC ÄÚ²¿×ÊÔ´¡£
+        m_pc.reset();
+    }
+    
+    // 3. ÖØÖÃ¹ÜÀíÆ÷×´Ì¬
+    m_targetPeerId.clear();
+    m_isCaller = false;
+    
+    // 4. ÇåÀí SignalingClient£¨¿ÉÑ¡£©
+    // Èç¹ûÄúÏ£ÍûÔÚÍ£Ö¹ P2P ºóÈÔ±£³ÖĞÅÁîÁ¬½Ó£¨ÒÔ±ãÔÙ´Îºô½Ğ»ò±»ºô½Ğ£©£¬Ôò¿ÉÒÔÌø¹ı´Ë²½¡£
+    // Èç¹ûÄúÏëÍêÈ«ÍË³ö»áÒé£¬Ó¦¸Ã¶Ï¿ªĞÅÁîÁ¬½Ó¡£
+    /*
+    if (m_ws) {
+        m_ws->close();
+        m_ws.reset();
+        m_myId.clear();
+    }
+    */
 
-//     currentTimestamp_ = timestamp; // æ›´æ–°å½“å‰å¸§çš„æ—¶é—´æˆ³
+    qDebug() << "PeerConnectionManager stopped and resources released.";
+    
+    // 5. Í¨Öª UI P2P ÒÑÖÕÖ¹
+    // ×¢Òâ£ºÄúÒÑ¾­ÔÚ onStateChange ÖĞ´¦ÀíÁË Disconnected ×´Ì¬µÄĞÅºÅ£¬
+    // µ«ÊÇÊÖ¶¯µ÷ÓÃ stop() Ó¦¸ÃÒ²·¢ĞÅºÅÒÔÈ·±£ UI ÏìÓ¦¡£
+    // emit p2pDisconnected(); // Èç¹ûÄúÏëÇø·ÖÊÇÔ¶¶Ë¶Ï¿ª»¹ÊÇ±¾µØÖ÷¶¯¶Ï¿ª£¬¿ÉÒÔ¶¨ÒåÒ»¸öĞÂĞÅºÅ
+}
 
-//     // H.264 NALU Header (1 byte)
-//     // [F|NRI|Type]
-//     uint8_t nalHeader = nalData[0];
-//     uint8_t nalType = nalHeader & 0x1F;
-
-//     // æƒ…å†µ 1: å•ä¸ª NAL å•å…ƒ (Single NAL Unit Packet)
-//     // å¦‚æœæ•°æ®è¶³å¤Ÿå°ï¼Œç›´æ¥å‘é€
-//     if (nalData.size() <= MAX_RTP_PAYLOAD_SIZE) {
-//         PeerConnectionManager::sendRtpPacket(nalData, true); // Marker = 1 (ä¸€å¸§ç»“æŸ)
-//         return;
-//     }
-
-//     // æƒ…å†µ 2: åˆ†ç‰‡å•å…ƒ (FU-A)
-//     // å¦‚æœæ•°æ®å¤ªå¤§ï¼Œå¿…é¡»æ‹†åˆ†
-//     // RFC 6184 Section 5.8
-
-//     // è·³è¿‡ NAL Headerï¼Œåªåˆ‡åˆ† Payload
-//     const uint8_t* payloadData = nalData.data() + 1;
-//     size_t payloadSize = nalData.size() - 1;
-//     size_t offset = 0;
-
-//     while (offset < payloadSize) {
-//         // è®¡ç®—å½“å‰åˆ†ç‰‡å¤§å°
-//         size_t chunkSize = std::min(MAX_RTP_PAYLOAD_SIZE - 2, payloadSize - offset);
-//         // -2 æ˜¯å› ä¸º FU-A éœ€è¦ 2 ä¸ªå­—èŠ‚çš„å¤´ (Indicator + Header)
-
-//         bool isFirstPacket = (offset == 0);
-//         bool isLastPacket = (offset + chunkSize == payloadSize);
-
-//         std::vector<uint8_t> fuaPacket;
-//         fuaPacket.reserve(chunkSize + 2);
-
-//         // 1. FU Indicator Byte
-//         // æ ¼å¼: [F|NRI|Type]
-//         // F, NRI æ¥è‡ªåŸå§‹ NAL Header
-//         // Type = 28 (FU-A)
-//         uint8_t fuIndicator = (nalHeader & 0xE0) | 28;
-//         fuaPacket.push_back(fuIndicator);
-
-//         // 2. FU Header Byte
-//         // æ ¼å¼: [S|E|R|Type]
-//         // S: Start bit, E: End bit, R: 0, Type: åŸå§‹ NAL Type
-//         uint8_t fuHeader = nalType;
-//         if (isFirstPacket) fuHeader |= 0x80; // Set S bit
-//         if (isLastPacket)  fuHeader |= 0x40; // Set E bit
-//         fuaPacket.push_back(fuHeader);
-
-//         // 3. Payload
-//         fuaPacket.insert(fuaPacket.end(), payloadData + offset, payloadData + offset + chunkSize);
-
-//         // å‘é€åˆ†ç‰‡
-//         // åªæœ‰æœ€åä¸€ä¸ªåˆ†ç‰‡çš„ Marker ä½æ‰ç½® 1
-//         sendRtpPacket(fuaPacket, isLastPacket);
-
-//         offset += chunkSize;
-//     }
-// }
+//void PeerConnectionManager::sendH264(const std::vector<uint8_t>& nalData, uint32_t timestamp)
+//{
+//
+//    currentTimestamp_ = timestamp; // ¸üĞÂµ±Ç°Ö¡µÄÊ±¼ä´Á
+//
+//    // H.264 NALU Header (1 byte)
+//    // [F|NRI|Type]
+//    uint8_t nalHeader = nalData[0];
+//    uint8_t nalType = nalHeader & 0x1F;
+//
+//    // Çé¿ö 1: µ¥¸ö NAL µ¥Ôª (Single NAL Unit Packet)
+//    // Èç¹ûÊı¾İ×ã¹»Ğ¡£¬Ö±½Ó·¢ËÍ
+//    if (nalData.size() <= MAX_RTP_PAYLOAD_SIZE) {
+//        sendRtpPacket(nalData, true); // Marker = 1 (Ò»Ö¡½áÊø)
+//        return;
+//    }
+//
+//    // Çé¿ö 2: ·ÖÆ¬µ¥Ôª (FU-A)
+//    // Èç¹ûÊı¾İÌ«´ó£¬±ØĞë²ğ·Ö
+//    // RFC 6184 Section 5.8
+//
+//    // Ìø¹ı NAL Header£¬Ö»ÇĞ·Ö Payload
+//    const uint8_t* payloadData = nalData.data() + 1;
+//    size_t payloadSize = nalData.size() - 1;
+//    size_t offset = 0;
+//
+//    while (offset < payloadSize) {
+//        // ¼ÆËãµ±Ç°·ÖÆ¬´óĞ¡
+//        size_t chunkSize = std::min(MAX_RTP_PAYLOAD_SIZE - 2, payloadSize - offset);
+//        // -2 ÊÇÒòÎª FU-A ĞèÒª 2 ¸ö×Ö½ÚµÄÍ· (Indicator + Header)
+//
+//        bool isFirstPacket = (offset == 0);
+//        bool isLastPacket = (offset + chunkSize == payloadSize);
+//
+//        std::vector<uint8_t> fuaPacket;
+//        fuaPacket.reserve(chunkSize + 2);
+//
+//        // 1. FU Indicator Byte
+//        // ¸ñÊ½: [F|NRI|Type]
+//        // F, NRI À´×ÔÔ­Ê¼ NAL Header
+//        // Type = 28 (FU-A)
+//        uint8_t fuIndicator = (nalHeader & 0xE0) | 28;
+//        fuaPacket.push_back(fuIndicator);
+//
+//        // 2. FU Header Byte
+//        // ¸ñÊ½: [S|E|R|Type]
+//        // S: Start bit, E: End bit, R: 0, Type: Ô­Ê¼ NAL Type
+//        uint8_t fuHeader = nalType;
+//        if (isFirstPacket) fuHeader |= 0x80; // Set S bit
+//        if (isLastPacket)  fuHeader |= 0x40; // Set E bit
+//        fuaPacket.push_back(fuHeader);
+//
+//        // 3. Payload
+//        fuaPacket.insert(fuaPacket.end(), payloadData + offset, payloadData + offset + chunkSize);
+//
+//        // ·¢ËÍ·ÖÆ¬
+//        // Ö»ÓĞ×îºóÒ»¸ö·ÖÆ¬µÄ Marker Î»²ÅÖÃ 1
+//        sendRtpPacket(fuaPacket, isLastPacket);
+//
+//        offset += chunkSize;
+//    }
+//}
+//
+//void PeerConnectionManager::sendRtpPacket(const std::vector<uint8_t>& payload, bool marker)
+//{
+//    // RTP Header ¹Ì¶¨ 12 ×Ö½Ú
+//    std::vector<uint8_t> packet;
+//    packet.resize(12 + payload.size());
+//
+//    uint8_t* header = reinterpret_cast<uint8_t*>(packet.data());
+//
+//    // Byte 0: V=2, P=0, X=0, CC=0 -> 0x80
+//    header[0] = 0x80;
+//
+//    // Byte 1: M (Marker), PT (Payload Type)
+//    header[1] = (marker ? 0x80 : 0x00) | (payloadType_ & 0x7F);
+//
+//    // Byte 2-3: Sequence Number (Big Endian)
+//    header[2] = (sequenceNumber_ >> 8) & 0xFF;
+//    header[3] = sequenceNumber_ & 0xFF;
+//    sequenceNumber_++;
+//
+//    // Byte 4-7: Timestamp (Big Endian)
+//    header[4] = (currentTimestamp_ >> 24) & 0xFF;
+//    header[5] = (currentTimestamp_ >> 16) & 0xFF;
+//    header[6] = (currentTimestamp_ >> 8) & 0xFF;
+//    header[7] = currentTimestamp_ & 0xFF;
+//
+//    // Byte 8-11: SSRC (Big Endian)
+//    header[8] = (ssrc_ >> 24) & 0xFF;
+//    header[9] = (ssrc_ >> 16) & 0xFF;
+//    header[10] = (ssrc_ >> 8) & 0xFF;
+//    header[11] = ssrc_ & 0xFF;
+//
+//    // ¿½±´ Payload
+//    std::memcpy(reinterpret_cast<uint8_t*>(packet.data()) + 12, payload.data(), payload.size());
+//
+//    // Í¨¹ı DataChannel ·¢ËÍ¶ş½øÖÆ
+//    //if (dc_) {
+//    //    try {
+//    //        dc_->send(packet); // libdatachannel ½ÓÊÜ std::vector<std::byte>
+//    //    }
+//    //    catch (...) {
+//    //        // ºöÂÔ·¢ËÍ´íÎó£¬·ÀÖ¹±ÀÀ£
+//    //    }
+//    //}
+//    emit rtpPacketReady(packet);
+//}
 
 QString PeerConnectionManager::id() const
 {

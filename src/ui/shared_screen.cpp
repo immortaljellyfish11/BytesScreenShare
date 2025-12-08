@@ -479,6 +479,7 @@ void shared_screen::on_btnShareScreenClicked()
     }
     else{
         CaptureService->stopCapture();
+        pcMgr->stop();
     }
     // CaptureService->startCapture();
 
