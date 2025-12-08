@@ -23,7 +23,7 @@ signals:
     void signalingConnected();
     void signalingError(const QString& msg);
     void peerJoined(const QString& peerId);
-    void p2pConnected();     // ÊÓÆµÍ¨µÀÒÑ½¨Á¢£¬¿ÉÒÔ¿ªÊ¼·¢ËÍÊý¾Ý
+    void p2pConnected();     // ï¿½ï¿½ÆµÍ¨ï¿½ï¿½ï¿½Ñ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¿ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     void p2pDisconnected();
     void encodedFrameReceived(QByteArray data);
 
@@ -31,19 +31,22 @@ signals:
     void disconnected();
     void errorOccurred(const QString& msg);
     void messageReceived(const QString& msg); 
+    void dataChannelOpened();
 
 public:
     void onConnectServer(const QString& url);
     void onSignalingMessage(const QJsonObject& obj);
     void onJoined(const QString& peerId);
+    void sendEncodedFrame(const QByteArray& data, uint32_t timestamp);
 
 private:
     void handleSignalingMessage(const QJsonObject& json);
     void sendSignalingMessage(const QString& type, const QString& to, const QJsonObject& data);
-
+    void sendtest();
     void createPeerConnection();
     void setupDataChannel();
     void bindDataChannel(std::shared_ptr<rtc::DataChannel> dc);
+
     
     
 private:

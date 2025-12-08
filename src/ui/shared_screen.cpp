@@ -137,6 +137,7 @@ shared_screen::shared_screen(QWidget *parent)
       ui(new Ui::shared_screen)
     , pcMgr(new PeerConnectionManager(this))
     , isConnected(false)
+    , CaptureService(new ScreenCaptureService(this))
 {
     ui->setupUi(this);
 
@@ -291,13 +292,17 @@ shared_screen::shared_screen(QWidget *parent)
     connect(btnChat, &QPushButton::clicked, this, &shared_screen::on_btnChatClicked);
     connect(btnVoice, &QPushButton::clicked, this, &shared_screen::on_btnVoiceClicked);
     connect(btnShareScreen, &QPushButton::clicked, this, &shared_screen::on_btnShareScreenClicked);
-    // connect(btnShareScreen, &QPushButton::clicked, this, &shared_screen::connectSignaling);
     connect(btnVideo, &QPushButton::clicked, this, &shared_screen::on_btnVideoClicked);
     connect(btnParticipants, &QPushButton::clicked, this, &shared_screen::on_btnParticipantsClicked);
     connect(btnRecord, &QPushButton::clicked, this, &shared_screen::on_btnRecordClicked);
     connect(btnRaiseHand, &QPushButton::clicked, this, &shared_screen::on_btnRaiseHandClicked);
     connect(btnLeave, &QPushButton::clicked, this, &shared_screen::on_btnLeaveClicked);
-
+    connect(pcMgr, &PeerConnectionManager::dataChannelOpened,
+            // 绑定到 ScreenCaptureService 的 startCapture 槽函数
+            CaptureService, &ScreenCaptureService::startCapture);
+    connect(CaptureService, &ScreenCaptureService::encodedFrameReady,
+            pcMgr, &PeerConnectionManager::sendEncodedFrame);
+            
     if (ui->btnSend)
         connect(ui->btnSend, &QPushButton::clicked, this, &shared_screen::on_btnSendClicked);
     connect(ui->chatInput, &QLineEdit::returnPressed, this, &shared_screen::on_btnSendClicked);
@@ -460,13 +465,21 @@ void shared_screen::on_btnVoiceClicked()
 // 共享屏幕按钮，点击建立p2p
 void shared_screen::on_btnShareScreenClicked()
 {
-    // startP2P();
-    QString targetId = pcMgr->target();
-    if (targetId.isEmpty()) {
-        QMessageBox::warning(this, "提示", "无其他在线用户");
-        return;
+
+    if(!isScreenSharing){
+        // startP2P();
+        QString targetId = pcMgr->target();
+        if (targetId.isEmpty()) {
+            QMessageBox::warning(this, "提示", "无其他在线用户");
+            return;
+        }
+        pcMgr->start(targetId);
     }
-    pcMgr->start(targetId);
+    else{
+        CaptureService->stopCapture();
+    }
+    // CaptureService->startCapture();
+
 
     isScreenSharing = !isScreenSharing;
     btnShareScreen->setChecked(isScreenSharing);

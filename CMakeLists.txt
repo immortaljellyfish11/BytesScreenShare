@@ -17,7 +17,7 @@ if(NOT DEFINED CMAKE_PREFIX_PATH)
     if(DEFINED ENV{QT_PATH})
         list(APPEND CMAKE_PREFIX_PATH "$ENV{QT_PATH}")
     else()
-        list(APPEND CMAKE_PREFIX_PATH "f:/Qt/6.8.3/msvc2022_64")
+        list(APPEND CMAKE_PREFIX_PATH "H:/qt6/6.8.3/msvc2022_64")
     endif()
 endif()
 
@@ -37,12 +37,16 @@ set(SRCS
     src/ui/shared_screen.cpp
     src/signaling/WsSignalingClient.cpp
     src/rtc/PeerConnectionManager.cpp
+    src/encoder/VideoEncoder.cpp
+    src/Capture/ScreenCaptureService.cpp
 )
 
 set(HEADERS
     src/ui/shared_screen.h
     src/signaling/WsSignalingClient.hpp
     src/rtc/PeerConnectionManager.hpp
+    src/encoder/VideoEncoder.h
+    src/Capture/ScreenCaptureService.h
 )
 
 set(UIS
@@ -52,7 +56,7 @@ set(UIS
 qt_wrap_ui(UI_HEADERS ${UIS})
 
 add_executable(${PROJECT_NAME}
-    WIN32
+    # WIN32
     ${SRCS}
     ${HEADERS}
     ${UI_HEADERS}
@@ -71,7 +75,7 @@ target_link_libraries(${PROJECT_NAME}
 # --------------------------------------
 # libdatachannel (rtc) 依赖
 # --------------------------------------
-set(RTC_ROOT "./third_part" CACHE PATH "libdatachannel install 根目录")
+set(RTC_ROOT "./third_part/libdatachannel" CACHE PATH "libdatachannel install 根目录")
 get_filename_component(RTC_ROOT_ABS "${RTC_ROOT}" ABSOLUTE)
 message(STATUS "libdatachannel RTC_ROOT_ABS=${RTC_ROOT_ABS}")
 
@@ -82,6 +86,34 @@ find_package(LibDataChannel CONFIG REQUIRED PATHS "${RTC_ROOT_ABS}" NO_DEFAULT_P
 
 target_link_libraries(${PROJECT_NAME} PRIVATE LibDataChannel::LibDataChannel)
 
+# --------------------------------------
+# FFmpeg 依赖
+# --------------------------------------
+set(FFMPEG_ROOT "./third_part/ffmpeg" CACHE PATH "FFmpeg 安装根目录")
+get_filename_component(FFMPEG_ROOT_ABS "${FFMPEG_ROOT}" ABSOLUTE)
+message(STATUS "FFmpeg FFMPEG_ROOT_ABS=${FFMPEG_ROOT_ABS}")
+
+# 添加头文件搜索路径
+target_include_directories(${PROJECT_NAME} PUBLIC
+    "${FFMPEG_ROOT_ABS}/include"
+)
+
+# 查找所需的 FFmpeg 库
+find_library(AVCODEC_LIBRARY NAMES avcodec PATHS "${FFMPEG_ROOT_ABS}/lib" REQUIRED)
+find_library(AVFORMAT_LIBRARY NAMES avformat PATHS "${FFMPEG_ROOT_ABS}/lib" REQUIRED)
+find_library(AVUTIL_LIBRARY NAMES avutil PATHS "${FFMPEG_ROOT_ABS}/lib" REQUIRED)
+find_library(SWSCALE_LIBRARY NAMES swscale PATHS "${FFMPEG_ROOT_ABS}/lib" REQUIRED)
+
+message(STATUS "FFmpeg Libraries: ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY} ${AVUTIL_LIBRARY}")
+
+# 链接 FFmpeg 库到项目
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    ${AVCODEC_LIBRARY}
+    ${AVFORMAT_LIBRARY}
+    ${AVUTIL_LIBRARY}
+    ${SWSCALE_LIBRARY}
+)
+
 # 运行时 DLL（已手动确认名称），统一复制到可执行目录（无检查）
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
@@ -89,6 +121,27 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "${RTC_ROOT_ABS}/bin/datachannel.dll"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
     COMMENT "复制 libdatachannel 运行时 DLL 到输出目录"
+)
+
+# FFmpeg DLL 复制
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FFMPEG_ROOT_ABS}/bin/avcodec-62.dll"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FFMPEG_ROOT_ABS}/bin/avformat-62.dll"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FFMPEG_ROOT_ABS}/bin/avutil-60.dll"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FFMPEG_ROOT_ABS}/bin/swresample-6.dll"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FFMPEG_ROOT_ABS}/bin/swscale-9.dll"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
+    COMMENT "复制 FFmpeg 运行时 DLLs 到输出目录"
 )
 
 # # ========================================

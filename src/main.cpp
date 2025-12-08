@@ -7,6 +7,7 @@ int main(int argc, char *argv[])
 {
     // qputenv("QT_LOGGING_RULES", "qt.multimedia.ffmpeg=false");
     QApplication a(argc, argv);
+
     shared_screen w;
     w.show();
     return a.exec();

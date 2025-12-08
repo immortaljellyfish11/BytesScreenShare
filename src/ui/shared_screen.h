@@ -54,6 +54,8 @@
 #include "src/signaling/WsSignalingClient.hpp"
 #include "src/rtc/PeerConnectionManager.hpp"
 #include "signaling-server/src/Common.hpp"
+#include "src/Capture/ScreenCaptureService.h"
+#include "src/encoder/VideoEncoder.h"
 
 using namespace std;
 QT_BEGIN_NAMESPACE
@@ -145,6 +147,7 @@ private:
 
     // ===== 新增：P2P 相关 =====
     PeerConnectionManager* pcMgr;
+    ScreenCaptureService* CaptureService;
     bool isConnected;
     
     // 状态管理
